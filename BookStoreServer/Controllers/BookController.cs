@@ -1,5 +1,7 @@
 ﻿using BookStoreServer.Interface;
+using BookStoreServer.Mappers;
 using BookStoreServer.Models;
+using BookStoreServer.Models.DTOs;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -13,6 +15,8 @@ namespace BookStoreServer.Controllers
         private readonly ILogger<BookController> _logger;
         private readonly IRepository<Book> _BookRepository;
         private readonly IConfiguration _configuration;
+        private static readonly string UploadDirectory = Path.Combine(Directory.GetCurrentDirectory(), "Uploads");
+
 
 
         public BookController(IRepository<Book> BookRepository, ILogger<BookController> logger, IConfiguration configuration)
@@ -161,7 +165,7 @@ namespace BookStoreServer.Controllers
         //[Bookize(Roles = "Book")]
         [HttpPost]
         [Route("CreateBook")]
-        public async Task<ActionResult<Book>> CreateBookAsync([FromBody] Book model)
+        public async Task<ActionResult<Book>> CreateBookAsync([FromForm] BookDTO model)
         {
             try
             {
@@ -175,7 +179,40 @@ namespace BookStoreServer.Controllers
                     });
                 }
 
-                var createdBook = await _BookRepository.CreateAsync(model);
+                if (model.File == null || model.File.Length == 0)
+                {
+                    return BadRequest("No file uploaded.");
+                }
+
+                string imageUrl = null;
+                try
+                {
+                    if (!Directory.Exists(UploadDirectory))
+                    {
+                        Directory.CreateDirectory(UploadDirectory);
+                    }
+
+                    string uniqueFileName = Guid.NewGuid().ToString() + Path.GetExtension(model.File.FileName);
+                    string filePath = Path.Combine(UploadDirectory, uniqueFileName);
+
+                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await model.File.CopyToAsync(stream);
+                    }
+
+                    imageUrl = $"{Request.Scheme}://{Request.Host}/uploads/{uniqueFileName}";
+                }catch(Exception ex)
+                {
+                    await Console.Out.WriteLineAsync(ex.Message.ToString());
+                }
+
+                model.BookImageLink = imageUrl;
+
+                RegisterToBook bookToMap = new RegisterToBook(model);
+                Book bookToAdd = bookToMap.GetBook();
+
+
+                var createdBook = await _BookRepository.CreateAsync(bookToAdd);
 
                 //return CreatedAtRoute("GetStudentById", new { id = createdBook.BookId }, Book);
                 if (createdBook == null)

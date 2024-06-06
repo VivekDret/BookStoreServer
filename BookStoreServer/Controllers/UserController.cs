@@ -4,6 +4,7 @@ using BookStoreServer.Models.DTOs;
 using BookStoreServer.Repository;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BookStoreServer.Controllers
@@ -16,6 +17,7 @@ namespace BookStoreServer.Controllers
         private readonly IRepository<User> _userRepository;
         private readonly IConfiguration _configuration;
         private readonly ICloudinaryService _cloudinaryService;
+        private static readonly string UploadDirectory = Path.Combine(Directory.GetCurrentDirectory(), "Uploads");
 
 
         public UserController(IRepository<User> userRepository, ILogger<UserController> logger, IConfiguration configuration, ICloudinaryService cloudinaryService)
@@ -359,10 +361,10 @@ namespace BookStoreServer.Controllers
                     });
                 }
                 dynamic user;
-                
-                user = await _userRepository.GetAsync(user => user.UserId == model.id , false);
 
-                
+                user = await _userRepository.GetAsync(user => user.UserId == model.id, false);
+
+
                 if (user == null)
                 {
                     return NotFound(new
@@ -377,11 +379,24 @@ namespace BookStoreServer.Controllers
                     return BadRequest("No file uploaded.");
                 }
 
-                var result = await _cloudinaryService.UploadImageAsync(model.file);
-                user.ProfileImage = result.SecureUrl.ToString();
+                dynamic result = await _cloudinaryService.UploadImageAsync(model.file);
+                await Console.Out.WriteLineAsync(result?.SecureUrl.ToString());
+
                 var status = false;
-                status = await _userRepository.UpdateAsync(user);
-                
+
+                if (result != null)
+                {
+                    user.UserProfilePic = result.SecureUrl.ToString();
+                    status = await _userRepository.UpdateAsync(user);
+                }
+                else
+                {
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = "Failed to upload image"
+                    });
+                }
 
                 if (status)
                 {
@@ -401,6 +416,115 @@ namespace BookStoreServer.Controllers
                         message = "User Not found"
                     });
                 }
+            }
+            catch (Exception ex)
+            
+            {
+                _logger.LogError(ex.Message);
+                return StatusCode(StatusCodes.Status500InternalServerError, new
+                {
+                    success = false,
+                    error = "An error occurred while adding user dp."
+                });
+            }
+        }
+
+
+        [HttpPost]
+        [Route("UploadLocalDisplayPicture")]
+        public async Task<ActionResult> UploadLocalDisplayPicture([FromForm] UploadPicDTO model)
+        {
+            try
+            {
+
+                if (model.id <= 0)
+                {
+                    _logger.LogWarning("Bad Request");
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = "Invalid User Id"
+                    });
+                }
+
+                var user = await _userRepository.GetAsync(user => user.UserId == model.id, false);
+
+
+                if (user == null)
+                {
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = "User not found"
+                    });
+                }
+
+                if (model.file == null || model.file.Length == 0)
+                {
+                    return BadRequest("No file uploaded.");
+                }
+
+                try
+                {
+                    if (!Directory.Exists(UploadDirectory))
+                    {
+                        Directory.CreateDirectory(UploadDirectory);
+                    }
+
+                    string uniqueFileName = Guid.NewGuid().ToString() + Path.GetExtension(model.file.FileName); 
+                    string filePath = Path.Combine(UploadDirectory, uniqueFileName);
+
+                    using(var stream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await model.file.CopyToAsync(stream);
+                    }
+
+                    string imageUrl = $"{Request.Scheme}://{Request.Host}/uploads/{uniqueFileName}";
+
+                    dynamic status;
+                    if (imageUrl != null)
+                    {
+                        user.UserProfilePic = imageUrl;
+                        status = await _userRepository.UpdateAsync(user);
+                    }
+                    else
+                    {
+                        return NotFound(new
+                        {
+                            success = false,
+                            message = "Failed to upload image"
+                        });
+                    }
+
+                    if (status != null)
+                    {
+                        return Ok(new
+                        {
+                            success = true,
+                            message = "Image Uploaded Successfully",
+                            user,
+                            imgRes = imageUrl
+                        });
+                    }
+                    else
+                    {
+                        return NotFound(new
+                        {
+                            success = false,
+                            message = "User Not found"
+                        });
+                    }
+                }
+                catch(Exception ex)
+                {
+                    await Console.Out.WriteLineAsync(ex.ToString());
+                    _logger.LogError(ex.Message);
+                    return StatusCode(StatusCodes.Status500InternalServerError, new
+                    {
+                        success = false,
+                        error = "An error occurred while adding user dp."
+                    });
+                }                
             }
             catch (Exception ex)
             {

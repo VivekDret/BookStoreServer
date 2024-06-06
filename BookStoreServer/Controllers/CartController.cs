@@ -62,12 +62,12 @@ namespace CartStoreServer.Controllers
         //GetCartById
         //[Cartize(Roles = "Admin, Cart, Owner")]
         [HttpGet]
-        [Route("GetCartById/{id}", Name = "GetCartById")]
-        public async Task<ActionResult<Cart>> GetCartByIdAsync(int id)
+        [Route("GetCartById/{userId}", Name = "GetCartByUserId")]
+        public async Task<ActionResult<Cart>> GetCartByIdAsync(int userId)
         {
             try
             {
-                if (id <= 0)
+                if (userId <= 0)
                 {
                     _logger.LogWarning("Bad Request");
                     return BadRequest(new
@@ -76,7 +76,7 @@ namespace CartStoreServer.Controllers
                         message = "Invalid Cart Id"
                     });
                 }
-                var Cart = await _CartRepository.GetAsync(Cart => Cart.CartID == id, false);
+                var Cart = await _CartRepository.GetAsync(Cart => Cart.UserId == userId, false);
 
 
                 if (Cart == null)
@@ -85,7 +85,7 @@ namespace CartStoreServer.Controllers
                     return NotFound(new
                     {
                         success = false,
-                        message = $"The 'Cart' with Id: {id} not found"
+                        message = $"The 'Cart' with Id: {userId} not found"
                     });
                 }
 
