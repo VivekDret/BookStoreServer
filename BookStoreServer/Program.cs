@@ -111,6 +111,16 @@ builder.Services.AddScoped<IAccountService, AccountServices>();
 
 #endregion
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAny",
+        builder =>
+        {
+            builder.AllowAnyOrigin()
+                   .AllowAnyMethod()
+                   .AllowAnyHeader();
+        });
+});
 
 var app = builder.Build();
 
@@ -120,6 +130,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+
+app.UseCors("AllowAny");
 app.UseAuthentication();
 app.UseAuthorization();
 
