@@ -1,5 +1,6 @@
 ﻿using BookStoreServer.Interface;
 using BookStoreServer.Models;
+using BookStoreServer.Models.DTOs;
 using BookStoreServer.Repository;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -14,13 +15,15 @@ namespace BookStoreServer.Controllers
         private readonly ILogger<UserController> _logger;
         private readonly IRepository<User> _userRepository;
         private readonly IConfiguration _configuration;
+        private readonly ICloudinaryService _cloudinaryService;
 
 
-        public UserController(IRepository<User> userRepository, ILogger<UserController> logger, IConfiguration configuration)
+        public UserController(IRepository<User> userRepository, ILogger<UserController> logger, IConfiguration configuration, ICloudinaryService cloudinaryService)
         {
             _userRepository = userRepository;
             _configuration = configuration;
             _logger = logger;
+            _cloudinaryService = cloudinaryService;
         }
 
 
@@ -339,93 +342,75 @@ namespace BookStoreServer.Controllers
 
         //UploadDisplay Picture
         //[Authorize(Roles = "Admin, User, Owner")]
-        //[HttpPost]
-        //[Route("UploadDisplayPicture")]
-        //public async Task<ActionResult> UploadDisplayPicture([FromForm] UploadPicDTO model)
-        //{
-        //    try
-        //    {
+        [HttpPost]
+        [Route("UploadDisplayPicture")]
+        public async Task<ActionResult> UploadDisplayPicture([FromForm] UploadPicDTO model)
+        {
+            try
+            {
 
-        //        if (model.id <= 0)
-        //        {
-        //            _logger.LogWarning("Bad Request");
-        //            return BadRequest(new
-        //            {
-        //                success = false,
-        //                message = "Invalid User Id"
-        //            });
-        //        }
-        //        dynamic user;
-        //        if (model.Role == "User")
-        //        {
-        //            user = await _userRepository.GetUserByIdAsync(model.id);
-        //        }
-        //        else if (model.Role == "Admin")
-        //        {
-        //            user = await _adminServices.GetAdminByIdAsync(model.id);
-        //        }
-        //        else
-        //        {
-        //            user = await _hotelOwnerServices.GetHotelOwnerByIdAsync(model.id);
-        //        }
-        //        if (user == null)
-        //        {
-        //            return NotFound(new
-        //            {
-        //                success = false,
-        //                message = "User not found"
-        //            });
-        //        }
+                if (model.id <= 0)
+                {
+                    _logger.LogWarning("Bad Request");
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = "Invalid User Id"
+                    });
+                }
+                dynamic user;
+                
+                user = await _userRepository.GetAsync(user => user.UserId == model.id , false);
 
-        //        if (model.file == null || model.file.Length == 0)
-        //        {
-        //            return BadRequest("No file uploaded.");
-        //        }
+                
+                if (user == null)
+                {
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = "User not found"
+                    });
+                }
 
-        //        var result = await _cloudinaryService.UploadImageAsync(model.file);
-        //        user.ProfileImage = result.SecureUrl.ToString();
-        //        var status = false;
-        //        if (model.Role == "User")
-        //        {
-        //            status = await _userRepository.UpdateUserAsync(user, false);
-        //        }
-        //        else if (model.Role == "Admin")
-        //        {
-        //            status = await _adminServices.UpdateAdminAsync(user, false);
-        //        }
-        //        else
-        //        {
-        //            status = await _hotelOwnerServices.UpdateHotelOwnerAsync(user, false);
-        //        }
+                if (model.file == null || model.file.Length == 0)
+                {
+                    return BadRequest("No file uploaded.");
+                }
 
-        //        if (status)
-        //        {
-        //            return Ok(new
-        //            {
-        //                success = true,
-        //                message = "Image Uploaded Successfully",
-        //                user,
-        //                imgRes = result
-        //            });
-        //        }
-        //        else
-        //        {
-        //            return NotFound(new
-        //            {
-        //                success = false,
-        //                message = "User Not found"
-        //            });
-        //        }
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        _logger.LogError(ex.Message);
-        //        return StatusCode(StatusCodes.Status500InternalServerError, new
-        //        {
-        //            success = false,
-        //            error = "An error occurred while adding user dp."
-        //        });
-        //    }
-        //}
+                var result = await _cloudinaryService.UploadImageAsync(model.file);
+                user.ProfileImage = result.SecureUrl.ToString();
+                var status = false;
+                status = await _userRepository.UpdateAsync(user);
+                
+
+                if (status)
+                {
+                    return Ok(new
+                    {
+                        success = true,
+                        message = "Image Uploaded Successfully",
+                        user,
+                        imgRes = result
+                    });
+                }
+                else
+                {
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = "User Not found"
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex.Message);
+                return StatusCode(StatusCodes.Status500InternalServerError, new
+                {
+                    success = false,
+                    error = "An error occurred while adding user dp."
+                });
+            }
+        }
     }
 }
