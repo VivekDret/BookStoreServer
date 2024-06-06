@@ -109,6 +109,16 @@ builder.Services.AddScoped<IRepository<OrderTbl>, OrderTblRepository>();
 builder.Services.AddScoped<IAuthService, AuthServices>();
 builder.Services.AddScoped<IAccountService, AccountServices>();
 
+builder.Services.AddScoped<ICloudinaryService>(serviceProvider =>
+{
+    var cloudinarySettings = builder.Configuration.GetSection("CloudinarySettings");
+    var cloudName = cloudinarySettings["CloudName"];
+    var apiKey = cloudinarySettings["ApiKey"];
+    var apiSecret = cloudinarySettings["ApiSecret"];
+
+    return new CloudinaryService(cloudName, apiKey, apiSecret);
+});
+
 #endregion
 
 builder.Services.AddCors(options =>
